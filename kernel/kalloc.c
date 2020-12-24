@@ -14,38 +14,40 @@ void freerange(void *pa_start, void *pa_end);
 extern char end[]; // first address after kernel.
                    // defined by kernel.ld.
 
-struct run {
+struct run
+{
   struct run *next;
 };
 
-struct kmem{
+struct kmem
+{
   struct spinlock lock;
   struct run *freelist;
 };
 
-
 struct kmem kmems[NCPU];
-void
-kinit()
+void kinit()
 {
-  for(int i=0; i<NCPU; i++){
-    initlock(&kmems[i].lock, "kmem");
+  for (int i = 0; i < NCPU; i++)
+  {
+    initlock(&kmems[i].lock, "kmem");   // 初始化对每个独立的CPU分配空闲链表
   }
-  freerange(end, (void*)PHYSTOP);
+  freerange(end, (void *)PHYSTOP);
 }
 
-void
-freerange(void *pa_start, void *pa_end)
+void freerange(void *pa_start, void *pa_end)
 {
   char *p;
-  p = (char*)PGROUNDUP((uint64)pa_start);
-  for(int count=0; p + PGSIZE <= (char*)pa_end; p += PGSIZE, count++) {
-    if(((uint64)p % PGSIZE) != 0 || (char*)p < end || (uint64)p >= PHYSTOP)
-      panic("freerange");
+  p = (char *)PGROUNDUP((uint64)pa_start);
+  for (int count = 0; p + PGSIZE <= (char *)pa_end; p += PGSIZE, count++)
+  {
+    if (((uint64)p % PGSIZE) != 0 || (char *)p < end || (uint64)p >= PHYSTOP)
+      panic("freerange");   // 非整页，不在范围内
 
+    // Fill with junk to catch dangling refs.
     memset(p, 1, PGSIZE);
-    struct run *r = (struct run*)p;
-    count = count % NCPU;
+    struct run *r = (struct run *)p;
+    count = count % NCPU;     // 给第几个count分配空闲列表
     acquire(&kmems[count].lock);
     r->next = kmems[count].freelist;
     kmems[count].freelist = r;
@@ -57,27 +59,26 @@ freerange(void *pa_start, void *pa_end)
 // which normally should have been returned by a
 // call to kalloc().  (The exception is when
 // initializing the allocator; see kinit above.)
-void
-kfree(void *pa)
+void kfree(void *pa)
 {
   struct run *r;
   int id;
 
-  if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
+  if (((uint64)pa % PGSIZE) != 0 || (char *)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
 
   // Fill with junk to catch dangling refs.
   memset(pa, 1, PGSIZE);
 
-  r = (struct run*)pa;
-//////////////////////////////////
-  push_off();
+  r = (struct run *)pa;
+
+  push_off();   // 关闭中断
   id = cpuid();
   acquire(&kmems[id].lock);
   r->next = kmems[id].freelist;
   kmems[id].freelist = r;
   release(&kmems[id].lock);
-  pop_off();
+  pop_off();    // 打开中断
 }
 
 // Allocate one 4096-byte page of physical memory.
@@ -89,30 +90,35 @@ kalloc(void)
   struct run *r = 0;
   int id;
   int count;
-////////////////////////////////////////
+  
+  // 关闭中断
   push_off();
   id = cpuid();
 
   //窃取内存块
   count = id;
-  while(!r) {
-    if(kmems[count].freelist) {
-      
+  while (!r)  
+  {   // 寻找空闲页r
+    if (kmems[count].freelist)
+    {  // count有空闲页
       acquire(&kmems[count].lock);
       r = kmems[count].freelist;
-      if(r)
+      if (r)
         kmems[count].freelist = r->next;
       release(&kmems[count].lock);
     }
-    
-    count = (count+1) % NCPU;
-    if(count == id) break;  //所有CPU均无空闲页
-  }
-  pop_off();
 
-  if(r) {
-    memset((char*)r, 5, PGSIZE); // fill with junk
-    return (void*)r;
-  } else
-    return (void*)0;  
+    count = (count + 1) % NCPU;
+    if (count == id)
+      break; //所有CPU均无空闲页
+  } 
+  pop_off();    // 打开中断
+
+  if (r)
+  {
+    memset((char *)r, 5, PGSIZE); // fill with junk
+    return (void *)r;
+  }
+  else
+    return (void *)0;
 }
