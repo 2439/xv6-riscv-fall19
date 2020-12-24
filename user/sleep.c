@@ -3,10 +3,10 @@
 
 int main(int argc, char *argv[]) {
     int minNum = 1;
-    for(int i=0; i<strlen(argv[1])-1; i++){
+    for(int i = 0; i < strlen(argv[1]) - 1; i++){   // 当前输入的最小数值，abcd对应4位，最小1000
         minNum *= 10;
     }
-    if (atoi(argv[1]) < minNum) {
+    if (atoi(argv[1]) < minNum) {   // 确保输入为整数
         printf("Some input error\n");
         exit();
     } else {
