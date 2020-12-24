@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
 }
 
 /**
- * 功能：找path目录下寻找的filename的文件
+ * 功能：找path目录树下寻找的filename的文件
  * 参数 path：目录树
  * 参数 filename：文件
  */
@@ -30,13 +30,13 @@ void find(char *path, char *filename)
     struct stat st; // path文件信息
 
     // 打开目录
-    if ((fd = open(path, 0)) < 0)
+    if ((fd = open(path, 0)) < 0) // 打开文件，读模式
     {
         printf("find: cannot open %s\n", path);
         close(fd);
         return;
     }
-    // 文件夹信息
+    // 文件信息stat st
     if (fstat(fd, &st) < 0)
     {
         printf("find: cannot stat %s\n", path);
@@ -53,24 +53,24 @@ void find(char *path, char *filename)
         }
         break;
     case T_DIR:
-        if (strlen(path) + 1 + DIRSIZ + 1 > sizeof buf)
+        if (strlen(path) + 1 + DIRSIZ + 1 > sizeof(buf)) // 1：/,DIRSIZ：文件名长，1：结束符
         {
             printf("ls: path too long\n");
             break;
         }
 
         strcpy(buf, path);
-        p = buf + strlen(buf);
+        p = buf + strlen(buf); // 指向path末尾
         *p++ = '/';
-        while (read(fd, &de, sizeof(de)) == sizeof(de))
+        while (read(fd, &de, sizeof(de)) == sizeof(de)) // 读取目录项
         {
             if (de.inum == 0 || strcmp(de.name, ".") == 0 || strcmp(de.name, "..") == 0)
-            {
+            { // de.inum == 0：根目录
                 continue;
             }
             memmove(p, de.name, strlen(de.name));
             p[strlen(de.name)] = 0;
-            find(buf, filename);
+            find(buf, filename); // 递归查找
         }
         break;
     }
@@ -78,14 +78,14 @@ void find(char *path, char *filename)
 }
 
 /**
- * 功能：
+ * 功能：解析路径，得到对应的的文件名
  */
 char *fmtname(char *path)
 {
-    static char buf[DIRSIZ + 1];
+    static char buf[DIRSIZ + 1]; // 文件名长DIRSIZ，结束符1
     char *p;
 
-    for (p = path + strlen(path); p >= path && *p != '/'; p--)
+    for (p = path + strlen(path); p >= path && *p != '/'; p--) // 从文件末尾倒退，直到第一个/
         ;
     p++;
 

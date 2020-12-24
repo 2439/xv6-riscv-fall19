@@ -69,7 +69,6 @@ void primes(int *pd)
         }
         else
         {
-            close(pd[0]);
             close(newpd[1]);
             primes(newpd); // newpd中素数判断
         }
