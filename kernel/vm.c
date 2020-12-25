@@ -161,7 +161,7 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
   a = PGROUNDDOWN(va);
   last = PGROUNDDOWN(va + size - 1);
   for(;;){
-    if((pte = walk(pagetable, a, 1)) == 0)
+    if((pte = walk(pagetable, a, 1)) == 0) 
       return -1;
     if(*pte & PTE_V)
       panic("remap");
@@ -191,7 +191,7 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 size, int do_free)
       panic("uvmunmap: walk");
     if((*pte & PTE_V) == 0){
       printf("va=%p pte=%p\n", a, *pte);
-      panic("uvmunmap: not mapped");
+      // panic("uvmunmap: not mapped");
     }
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
@@ -450,4 +450,25 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+static void vmprintpagetable(pagetable_t pagetable, int level) {
+  for(int i = 0; i < 512; i++) {
+    pte_t pte = pagetable[i];
+    if((pte & PTE_V) && (pte & (PTE_R | PTE_W | PTE_X)) == 0) {
+      for(int j = 0; j < level; j++) {
+        printf(" ..");
+      }
+      printf("%d: pte %p pa %p\n", i, pte, PTE2PA(pte));
+
+      uint64 child = PTE2PA(pte);
+      vmprintpagetable((pagetable_t)child, level + 1);
+    }
+  }
+}
+
+// 打印页表
+void vmprint(pagetable_t pagetable) {
+  printf("page table %p\n", pagetable);
+  vmprintpagetable(pagetable, 1);
 }

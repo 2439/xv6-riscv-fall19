@@ -68,6 +68,29 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
+    if(r_scause() == 15) {  // 页面错误
+      uint64 va = r_stval();
+      uint64 oldsz = PGROUNDDOWN(va);
+      uint64 a = oldsz;
+      uint64 newsz = p->sz;
+      char *mem;
+      
+      for(; a < newsz; a += PGSIZE) {printf("1\n");
+        mem = kalloc();
+        if(mem == 0) {printf("3\n");
+          uvmdealloc((pagetable_t)va, oldsz, oldsz);
+          vmprint((pagetable_t)va);
+          return;
+        }
+        memset(mem, 0, PGSIZE);printf("4\n");
+        if(mappages((pagetable_t)va, oldsz, PGSIZE, (uint64)mem, PTE_W | PTE_X | PTE_R | PTE_U) != 0) {
+          kfree(mem);printf("5\n");
+          uvmdealloc((pagetable_t)va, oldsz, oldsz);
+          vmprint((pagetable_t)va);
+          return;
+        }
+      }
+    } 
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;
